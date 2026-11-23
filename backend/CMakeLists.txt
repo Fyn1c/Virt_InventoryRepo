@@ -11,11 +11,10 @@ include_directories(
 
 add_executable(MyFirstApp
     main.cpp
-    main.h
     src/routes/operations_routes.cpp
 )
 
 
 add_executable(seed_db
-    src/seed.cpp
+    src/routes/seed.cpp
 )

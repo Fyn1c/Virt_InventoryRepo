@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../backend/src/routes/operations_routes.hpp"
+#include "./src/routes/operations_routes.hpp"
 
 int main() {
     const auto created = handle_create_operation_mock(1, R"({"type":"income","quantity":10})");
