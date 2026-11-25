@@ -15,6 +15,6 @@ add_executable(MyFirstApp
 )
 
 
-add_executable(seed_db
-    src/routes/seed.cpp
-)
+# add_executable(seed_db
+#     src/routes/seed.cpp
+# )
