@@ -12,7 +12,7 @@ nlohmann::json ApiError::to_json() const {
     return j;
 }
 
-ApiError ApiError::validation(const std::vector<FieldError>& fields) {
+ApiError ApiError::validation_error(const std::vector<validation::FieldError>& fields) {
     return {400, "validation_error", "Ошибка валидации", fields};
 }
 ApiError ApiError::not_found(const std::string& what) {
@@ -23,7 +23,4 @@ ApiError ApiError::insufficient_stock(const std::string& message) {
 }
 ApiError ApiError::internal(const std::string& message) {
     return {500, "internal_error", message, {}};
-}
-ApiError ApiError::not_implemented() {
-    return {501, "not_implemented", "ещё не реализовано", {}};
 }

@@ -4,9 +4,14 @@
 #include <iostream>
 
 int main() {
-    Config config = Config::from_env();
-    DbPool data_base(config.db_connection_string(), 4);
-    Server server(config.host, config.port, data_base);
-    server.run();
+    try {
+        Config config = Config::from_env();
+        DbPool data_base(config.db_connection_string(), 4);
+        Server server(config.host, config.port, data_base);
+        server.run();
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal: " << e.what() << "\n";
+        return 1;
+    }
     return 0;
 }

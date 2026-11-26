@@ -1,19 +1,50 @@
 #include "../include/operations_routes.hpp"
-#include "../include/product_routes.h"
 #include "../include/errors.h"
 #include "../include/validation.h"
-#include <chrono>
-#include <ctime>
-#include <iomanip>
-#include <sstream>
-#include <string>
-#include <optional>
-
 #include <nlohmann/json.hpp>
+#include <stdexcept>
+#include <string>
 
 using json = nlohmann::json;
 
-HttpResponse handle_create_operation(DbPool& data_base, int product_id, const std::string& raw_body) {
+namespace {
+
+HttpResponse from_error(const ApiError& e) {
+    return { e.http_status, "application/json; charset=utf-8", e.to_json().dump() };
+}
+
+std::int64_t computeStockOn(PGconn* conn, std::int64_t productId) {
+    const char* sql =
+        "SELECT COALESCE(SUM(CASE WHEN type='приход' THEN quantity "
+        "                        WHEN type='расход' THEN -quantity "
+        "                        ELSE 0 END), 0) "
+        "FROM operations WHERE product_id = $1";
+    auto r = DbPool::execParamsTx(conn, sql, { std::to_string(productId) });
+    if (!r.is_ok() || PQntuples(r.get()) == 0)
+        throw std::runtime_error("stock query failed");
+    return std::stoll(PQgetvalue(r.get(), 0, 0));
+}
+
+json operation_to_json(PGresult* r, int row = 0) {
+    json item;
+    item["id"]          = std::stoi(PQgetvalue(r, row, 0));
+    item["productId"]   = std::stoi(PQgetvalue(r, row, 1));
+    item["productName"] = PQgetvalue(r, row, 2);
+    item["type"]        = PQgetvalue(r, row, 3);
+    item["quantity"]    = std::stoi(PQgetvalue(r, row, 4));
+    if (PQgetisnull(r, row, 5))
+        item["resultStatus"] = nullptr;
+    else
+        item["resultStatus"] = PQgetvalue(r, row, 5);
+    item["createdAt"]   = PQgetvalue(r, row, 6);
+    return item;
+}
+
+}  // namespace
+
+// POST /api/products/{id}/operations
+HttpResponse handle_create_operation(DbPool& db, int product_id,
+                                     const std::string& raw_body) {
     auto body = nlohmann::json::parse(raw_body, nullptr, false);
     if (body.is_discarded())
         return from_error(ApiError::validation_error({{"body", "invalid JSON"}}));
@@ -21,97 +52,120 @@ HttpResponse handle_create_operation(DbPool& data_base, int product_id, const st
     auto v = validation::validateOperationCreate(body);
     if (!v.result.ok())
         return from_error(ApiError::validation_error(v.result.errors));
+
+    const auto& req = v.request;
+
+    // Товар существует?
+    auto exists = db.execParams("SELECT 1 FROM products WHERE id = $1",
+                                { std::to_string(product_id) });
+    if (!exists.is_ok())
+        return from_error(ApiError::internal("DB error"));
+    if (PQntuples(exists.get()) == 0)
+        return from_error(ApiError::not_found("Товар не найден"));
+
+    HttpResponse response = from_error(ApiError::internal("transaction failed"));
+    bool committed = false;
+
     try {
-        auto j = json::parse(raw_body);
-        std::string type = j.value("type", "income");
-        std::string status = j.value("status", "");
-        std::string quantity = j.value("quantity", "0");
+        committed = db.execTransaction([&](PGconn* conn) {
+            std::string type_str = validation::toString(req.type);
+            std::string qty_str  = std::to_string(req.quantity);
 
-        if (type == "in" || type == "out") {
-            std::string sql = 
-                "INSERT INTO operations (product_id, type, quantity) "
-                "VALUES ($1, $2, $3) RETURNING id, created_at";
-            
-            auto result = data_base.execParams(sql, {std::to_string(product_id), type, quantity});
-            
-            if (!result.is_ok()) {
-                return {400, "application/json", R"({"error": "DB insert error"})"};
+            if (req.type == validation::OperationType::Expense) {
+                // блокируем строку товара
+                auto lock = DbPool::execParamsTx(conn,
+                    "SELECT id FROM products WHERE id = $1 FOR UPDATE",
+                    { std::to_string(product_id) });
+                if (!lock.is_ok() || PQntuples(lock.get()) == 0)
+                    throw std::runtime_error("product lock failed");
+
+                std::int64_t stock = computeStockOn(conn, product_id);
+                if (req.quantity > stock)
+                    throw std::runtime_error("INSUFFICIENT_STOCK");
+
+                auto ins = DbPool::execParamsTx(conn,
+                    "INSERT INTO operations (product_id, type, quantity, result_status) "
+                    "VALUES ($1, $2, $3, NULL) "
+                    "RETURNING id, product_id, "
+                    "  (SELECT name FROM products WHERE id = $1), "
+                    "  type, quantity, result_status, "
+                    "  to_char(created_at AT TIME ZONE 'UTC', "
+                    "          'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+                    { std::to_string(product_id), type_str, qty_str });
+                if (!ins.is_ok()) throw std::runtime_error("insert failed");
+
+                response = { 201, "application/json; charset=utf-8",
+                             operation_to_json(ins.get()).dump() };
             }
+            else if (req.type == validation::OperationType::Income) {
+                auto ins = DbPool::execParamsTx(conn,
+                    "INSERT INTO operations (product_id, type, quantity, result_status) "
+                    "VALUES ($1, $2, $3, NULL) "
+                    "RETURNING id, product_id, "
+                    "  (SELECT name FROM products WHERE id = $1), "
+                    "  type, quantity, result_status, "
+                    "  to_char(created_at AT TIME ZONE 'UTC', "
+                    "          'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+                    { std::to_string(product_id), type_str, qty_str });
+                if (!ins.is_ok()) throw std::runtime_error("insert failed");
 
-            json response;
-            response["id"] = std::stoi(PQgetvalue(result.get(), 0, 0));
-            response["product_id"] = product_id;
-            response["type"] = type;
-            response["quantity"] = std::stoi(quantity);
-            response["created_at"] = PQgetvalue(result.get(), 0, 1);
-            return {201, "application/json", response.dump()};
-        } 
-        else if (type == "move") {
-            std::string sql = 
-                "INSERT INTO operations (product_id, type, from_status, to_status) "
-                "VALUES ($1, $2, (SELECT status FROM products WHERE id = $1), $3) "
-                "RETURNING id, created_at";
-            
-            auto result = data_base.execParams(sql, {std::to_string(product_id), type, status});
-            
-            if (!result.is_ok()) {
-                return {400, "application/json", R"({"error": "DB insert error"})"};
+                response = { 201, "application/json; charset=utf-8",
+                             operation_to_json(ins.get()).dump() };
             }
+            else {  // Move
+                const std::string& target = *req.targetStatus;
 
-            json response;
-            response["id"] = std::stoi(PQgetvalue(result.get(), 0, 0));
-            response["product_id"] = product_id;
-            response["type"] = type;
-            response["new_status"] = status;
-            response["created_at"] = PQgetvalue(result.get(), 0, 1);
-            return {201, "application/json", response.dump()};
-        }
-        
-        return {400, "application/json", R"({"error": "Unknown operation type"})"};
+                auto upd = DbPool::execParamsTx(conn,
+                    "UPDATE products SET status = $1 WHERE id = $2",
+                    { target, std::to_string(product_id) });
+                if (!upd.is_command_ok()) throw std::runtime_error("update failed");
 
+                auto ins = DbPool::execParamsTx(conn,
+                    "INSERT INTO operations (product_id, type, quantity, result_status) "
+                    "VALUES ($1, $2, $3, $4) "
+                    "RETURNING id, product_id, "
+                    "  (SELECT name FROM products WHERE id = $1), "
+                    "  type, quantity, result_status, "
+                    "  to_char(created_at AT TIME ZONE 'UTC', "
+                    "          'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+                    { std::to_string(product_id), type_str, qty_str, target });
+                if (!ins.is_ok()) throw std::runtime_error("insert failed");
+
+                response = { 201, "application/json; charset=utf-8",
+                             operation_to_json(ins.get()).dump() };
+            }
+        });
     } catch (const std::exception& e) {
-        return {400, "application/json", std::string(R"({"error": ")") + e.what() + R"("})"};
+        if (std::string(e.what()) == "INSUFFICIENT_STOCK")
+            return from_error(ApiError::insufficient_stock(
+                "Недостаточно товара на складе для списания"));
+        return from_error(ApiError::internal(e.what()));
     }
+
+    if (!committed)
+        return from_error(ApiError::internal("transaction rolled back"));
+
+    return response;
 }
 
+// GET /api/operations
 HttpResponse handle_list_operations(DbPool& db) {
-
-    std::string sql = 
+    const char* sql =
         "SELECT o.id, o.product_id, p.name, o.type, o.quantity, "
-        "o.from_status, o.to_status, o.created_at "
+        "       o.result_status, "
+        "       to_char(o.created_at AT TIME ZONE 'UTC', "
+        "               'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') "
         "FROM operations o "
         "JOIN products p ON o.product_id = p.id "
-        "ORDER BY o.created_at DESC";
+        "ORDER BY o.created_at DESC, o.id DESC";
 
-    auto result = db.execParams(sql, {});
-    if (!result.is_ok()) {
-        return {500, "application/json", R"({"error": "DB query error"})"};
-    }
+    auto res = db.execParams(sql, {});
+    if (!res.is_ok())
+        return from_error(ApiError::internal("DB query error"));
 
-    json response;
-    response["items"] = json::array();
-    
-    int rows = PQntuples(result.get());
-    for (int i = 0; i < rows; ++i) {
-        json item;
-        item["id"] = std::stoi(PQgetvalue(result.get(), i, 0));
-        item["product_id"] = std::stoi(PQgetvalue(result.get(), i, 1));
-        item["product_name"] = PQgetvalue(result.get(), i, 2);
-        item["type"] = PQgetvalue(result.get(), i, 3);
-        
-        if (!PQgetisnull(result.get(), i, 4)){
-            item["quantity"] = std::stoi(PQgetvalue(result.get(), i, 4));
-        }
-        if (!PQgetisnull(result.get(), i, 5)){
-            item["previous_status"] = PQgetvalue(result.get(), i, 5);
-        }
-        if (!PQgetisnull(result.get(), i, 6)){
-            item["new_status"] = PQgetvalue(result.get(), i, 6);
-        }
-        
-        item["created_at"] = PQgetvalue(result.get(), i, 7);
-        response["items"].push_back(item);
-    }
-    return {200, "application/json", response.dump()};
+    json arr = json::array();
+    for (int i = 0; i < PQntuples(res.get()); ++i)
+        arr.push_back(operation_to_json(res.get(), i));
+
+    return { 200, "application/json; charset=utf-8", arr.dump() };
 }
-

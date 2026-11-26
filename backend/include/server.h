@@ -3,7 +3,6 @@
 #include <boost/beast/http.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <string>
-#include <optional>
 #include "data_base_pool.h"
 
 class Server {
@@ -12,7 +11,7 @@ public:
     void run();
 
 private:
-	DbPool& db_;
+    DbPool& db_;
     void handle_session(boost::asio::ip::tcp::socket& socket);
 
     std::string address_;
