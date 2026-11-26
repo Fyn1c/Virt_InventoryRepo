@@ -1,5 +1,7 @@
 #include "../include/operations_routes.hpp"
 #include "../include/product_routes.h"
+#include "../include/errors.h"
+#include "../include/validation.h"
 #include <chrono>
 #include <ctime>
 #include <iomanip>
@@ -12,6 +14,13 @@
 using json = nlohmann::json;
 
 HttpResponse handle_create_operation(DbPool& data_base, int product_id, const std::string& raw_body) {
+    auto body = nlohmann::json::parse(raw_body, nullptr, false);
+    if (body.is_discarded())
+        return from_error(ApiError::validation_error({{"body", "invalid JSON"}}));
+
+    auto v = validation::validateOperationCreate(body);
+    if (!v.result.ok())
+        return from_error(ApiError::validation_error(v.result.errors));
     try {
         auto j = json::parse(raw_body);
         std::string type = j.value("type", "income");

@@ -66,6 +66,19 @@ HttpResponse handle_get_product(DbPool& data_base, int product_id) {
 }
 
 HttpResponse handle_create_product(DbPool& data_base, const std::string& raw_body) {
+    auto body = nlohmann::json::parse(raw_body, nullptr, false);
+    if (body.is_discarded())
+        return from_error(ApiError::validation_error({{"body", "invalid JSON"}}));
+
+    auto v = validation::validateProductCreate(body);
+    if (!v.ok())
+        return from_error(ApiError::validation_error(v.errors));
+
+    auto res = db.execParams(
+        "INSERT INTO products (name) VALUES ($1) RETURNING id, name, status, created_at",
+        { body["name"].get<std::string>() });
+    if (!res.is_ok())
+        return from_error(ApiError::internal("DB insert error"));
     try {
         auto j = json::parse(raw_body);
         std::string name = j.value("name", "");

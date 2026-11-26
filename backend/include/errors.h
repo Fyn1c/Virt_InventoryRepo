@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
+#include <validation.h>
 
 struct ApiError {
     int         http_status{};
