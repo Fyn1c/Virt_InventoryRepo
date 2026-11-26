@@ -38,6 +38,11 @@ rm minikube-linux-amd64
 ./start.sh
 ```
 
+чтобы получить доступ к фронту
+```
+minikube service frontend-service --url
+```
+
 В случае, если нужно всё остановить
 ```
 ./stop.sh

@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY backend/ ./
+COPY . ./
 
 
 RUN rm -rf build && \
