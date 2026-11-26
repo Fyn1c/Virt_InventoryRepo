@@ -69,3 +69,5 @@ Testing/
 
 .vscode/
 ./backend/src/routes/seed.cpp
+
+.DS_Store
