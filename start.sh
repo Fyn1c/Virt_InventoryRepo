@@ -6,6 +6,8 @@ docker build -t database-container:latest ./database
 docker build -t backend-container:latest ./backend
 docker build -t frontend-container:latest ./frontend
 
+minikube start --driver=docker
+
 minikube image load database-container:latest
 minikube image load backend-container:latest
 minikube image load frontend-container:latest
