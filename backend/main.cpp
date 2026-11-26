@@ -1,13 +1,17 @@
+#include "include/server.h"
+#include "include/config.h"
+#include "include/data_base_pool.h"
 #include <iostream>
-#include "./src/routes/operations_routes.hpp"
 
 int main() {
-    const auto created = handle_create_operation_mock(1, R"({"type":"income","quantity":10})");
-    std::cout << "POST mock status: " << created.status_code << "\n" << created.body << "\n\n";
-
-
-    const auto journal = handle_list_operations_mock();
-    std::cout << "GET mock status: " << journal.status_code << "\n" << journal.body << "\n";
-
+    try {
+        Config config = Config::from_env();
+        DbPool data_base(config.db_connection_string(), 4);
+        Server server(config.host, config.port, data_base);
+        server.run();
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal: " << e.what() << "\n";
+        return 1;
+    }
     return 0;
 }

@@ -1,19 +1,43 @@
-FROM gcc:latest AS build
+FROM ubuntu:24.04 AS builder
 
-RUN apt-get update && apt-get install -y cmake
+ENV DEBIAN_FRONTEND=noninteractive
 
-ADD . /app
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libboost-dev \
+    nlohmann-json3-dev \
+    libpq-dev \
+    libpqxx-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN cmake -B build && cmake --build build 
+COPY backend/ ./
 
-FROM ubuntu:latest 
 
-RUN groupadd -r sample && useradd -r -g sample sample
-USER sample
+RUN rm -rf build && \
+    cmake -B build -S . && \
+    cmake --build build 
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    libssl3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=build /app/build/backend-service .
 
-ENTRYPOINT ["./backend-service"]
+
+COPY --from=builder /app/build/backend-service ./backend-service
+
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["./backend-service"]
