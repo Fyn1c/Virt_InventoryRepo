@@ -20,7 +20,8 @@ const jornal = [
 
 export function App() {
   const [page, setPage] = useState<"register" | "journal">("register");
-  const [search, setSearch] = useState("");
+  //const [search, setSearch] = useState(""); компилятор ругается на то что search не использован потом обратно добавить при надобности
+  const [, setSearch] = useState("");
   type ActiveModal = "none" | "entrance" | "moving" | "write_downs";
   const [activeModal, setActiveModal] = useState<ActiveModal>("none");
 

@@ -89,7 +89,7 @@ spec:
         image: frontend-container:latest
         imagePullPolicy: Never
         ports:
-        - containerPort: 5173
+        - containerPort: 80
 ---
 apiVersion: v1
 kind: Service
@@ -101,5 +101,5 @@ spec:
     app: frontend
   ports:
   - port: 80
-    targetPort: 5173
+    targetPort: 80
     nodePort: 30000
