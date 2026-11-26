@@ -14,13 +14,6 @@ minikube image load frontend-container:latest
 
 kubectl apply -f deployment.yml
 
-
-echo "=== 6. Настройка проброса портов ==="
-pkill -f "port-forward" || true
-kubectl port-forward service/frontend-service 30000:80 > /dev/null 2>&1 &
-kubectl port-forward service/backend-service 30080:8080 > /dev/null 2>&1 &
-
-
 pkill -f "port-forward" || true
 kubectl port-forward service/frontend-service 30000:80 > /dev/null 2>&1 &
 ##kubectl port-forward service/backend-service 30080:8080 > /dev/null 2>&1 &
