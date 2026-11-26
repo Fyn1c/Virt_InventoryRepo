@@ -90,6 +90,10 @@ void Server::handle_session(tcp::socket& socket) {
         our_response = handle_update_product_status(db_, std::stoi(parts[1]), std::string(request.body()));
     }
 
+    else if (method == "DELETE" && parts.size() == 2 && parts[0] == "products") {
+        our_response = handle_delete_product(db_, std::stoi(parts[1]));
+    }
+
     // --- ФОРМИРОВАНИЕ HTTP ОТВЕТА ---
     http::response<http::string_body> result{
         static_cast<http::status>(our_response.status_code), request.version()

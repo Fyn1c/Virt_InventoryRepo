@@ -1,4 +1,5 @@
 #include "../include/data_base_pool.h"
+#include <functional>
 
 
 DbPool::DbPool(const std::string& conn_str, size_t pool_size) {
@@ -49,4 +50,46 @@ PgResult DbPool::execParams(const std::string& sql, const std::vector<std::strin
 
     release(conn);
     return PgResult(res);
+}
+
+
+PgResult DbPool::execParamsTx(PGconn* conn, const std::string& sql,
+                              const std::vector<std::string>& params) {
+    std::vector<const char*> param_values;
+    param_values.reserve(params.size());
+    for (const auto& p : params) param_values.push_back(p.c_str());
+
+    PGresult* res = PQexecParams(
+        conn, sql.c_str(), params.size(), nullptr,
+        param_values.data(), nullptr, nullptr, 0
+    );
+    return PgResult(res);
+}
+
+bool DbPool::execTransaction(const std::function<void(PGconn*)>& fn) {
+    PGconn* conn = acquire();
+    struct Releaser {
+        DbPool* pool; PGconn* conn;
+        ~Releaser() { pool->release(conn); }
+    } releaser{this, conn};
+
+    auto exec = [&](const std::string& sql) {
+        auto r = execParamsTx(conn, sql, {});
+        if (!r.is_command_ok()) {
+            throw std::runtime_error(std::string("tx exec failed: ") +
+                                     PQerrorMessage(conn));
+        }
+    };
+
+    try {
+        exec("BEGIN");
+        fn(conn);
+        exec("COMMIT");
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "Transaction rollback: " << e.what() << "\n";
+        auto r = execParamsTx(conn, "ROLLBACK", {});
+        (void)r;
+        return false;
+    }
 }

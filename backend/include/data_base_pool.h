@@ -6,6 +6,7 @@
 #include <memory>
 #include <stdexcept>
 #include <iostream>
+#include <functional>
 
 class PgResult {
 public:
@@ -35,6 +36,11 @@ public:
     PgResult execParams(const std::string& sql, const std::vector<std::string>& params);
 
     void release(PGconn* conn);
+    
+    bool execTransaction(const std::function<void(PGconn*)>& fn);
+
+    static PgResult execParamsTx(PGconn* conn, const std::string& sql,
+                                const std::vector<std::string>& params);
 
 private:
     PGconn* acquire();

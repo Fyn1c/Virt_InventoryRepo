@@ -130,3 +130,17 @@ HttpResponse handle_update_product_status(DbPool& data_base, int product_id, con
         return {400, "application/json", R"({"error": "Invalid JSON"})"};
     }
 }
+
+HttpResponse handle_delete_product(DbPool& db, int product_id) {
+    auto res = db.execParams("DELETE FROM products WHERE id = $1",
+                             { std::to_string(product_id) });
+    if (!res.is_command_ok())
+        return { 500, "application/json; charset=utf-8",
+                 ApiError::internal("DB error").to_json().dump() };
+    // PQcmdTuples вернёт "0" если ничего не удалено, "1" если удалено
+    std::string affected = PQcmdTuples(res.get());
+    if (affected == "0" || affected.empty())
+        return { 404, "application/json; charset=utf-8",
+                 ApiError::not_found("Товар не найден").to_json().dump() };
+    return { 204, "application/json; charset=utf-8", "" };
+}
