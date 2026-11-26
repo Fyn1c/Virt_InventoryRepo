@@ -1,7 +1,0 @@
-{
-  "dependencies": [
-    "boost-beast",
-    "libpq",
-    "nlohmann-json"
-  ]
-}

@@ -8,7 +8,7 @@ find_package(Boost REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(PostgreSQL REQUIRED)
 
-add_executable(MyFirstApp
+add_executable(backend-service
     main.cpp
     src/data_base_pool.cpp
     src/errors.cpp
@@ -18,13 +18,14 @@ add_executable(MyFirstApp
     src/server.cpp
 )
 
-target_include_directories(MyFirstApp PRIVATE
+target_include_directories(backend-service PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(MyFirstApp PRIVATE
+target_link_libraries(backend-service PRIVATE
+    Boost::boost
     nlohmann_json::nlohmann_json
     PostgreSQL::PostgreSQL
 )
