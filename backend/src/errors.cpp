@@ -1,4 +1,4 @@
-#include "errors.hpp"
+#include "../include/errors.h"
 
 nlohmann::json ApiError::to_json() const {
     nlohmann::json j;
