@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS test_products (
 CREATE TABLE IF NOT EXISTS test_operations (
     "id"            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "product_id"    INTEGER NOT NULL REFERENCES test_products(id) ON DELETE CASCADE,
-    "type"          TEXT NOT NULL CHECK (type IN ('in', 'out', 'move')),
+    "type"          TEXT NOT NULL,
     "quantity"      INTEGER CHECK (quantity >= 1 AND quantity <= 100000),
     "from_status"   TEXT,
     "to_status"     TEXT, 
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS operations (
     "id"            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "product_id"    INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    "type"          TEXT NOT NULL CHECK (type IN ('in', 'out', 'move')),
+    "type"          TEXT NOT NULL,
     "quantity"      INTEGER CHECK (quantity >= 1 AND quantity <= 100000),
     "from_status"   TEXT,
     "to_status"     TEXT, 
