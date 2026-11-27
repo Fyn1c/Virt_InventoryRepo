@@ -4,17 +4,16 @@ export type Status = "На складе" | "выдано" | "в резерве";
 
 interface MovingProps {
   isOpen: boolean;
-  productName: string;
   onClose: () => void;
   onSubmit?: (status: Status) => void;
 }
 
 export function Moving({
   isOpen,
-  productName,
   onClose,
   onSubmit,
 }: MovingProps) {
+  const [productName, setProductName] = useState<string>("");
   const [status, setStatus] = useState<Status | "">("");  // хук внутри компонента
   const [error, setError] = useState<string>("");
 
@@ -22,6 +21,12 @@ export function Moving({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+
+    const name = productName.trim();
+    if (name === "") {
+      setError("Введите наименование товара");
+      return;
+    }
 
     if (!status) {
       setError("Выберите статус");
@@ -56,9 +61,19 @@ export function Moving({
           boxSizing: "border-box",
         }}
       >
+        
         <h3>Перемещение: {productName}</h3>
-
         <label>
+          Наименование товара:
+          <input
+            type="text"
+            value={productName}
+            onChange={(e) => {
+              setProductName(e.target.value);
+              if (error) setError("");
+            }}
+            placeholder="Введите имя товара"
+          />
           Статус:
           <select
             value={status}

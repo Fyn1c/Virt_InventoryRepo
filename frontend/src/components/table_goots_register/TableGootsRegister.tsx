@@ -1,7 +1,7 @@
 import React from 'react';
 //import './table.css';
 
-type Goods = {
+export type Goods = {
   id: number;
   name: string;
   status: string;

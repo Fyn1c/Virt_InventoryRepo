@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 
 interface WriteDownsProps {
   isOpen: boolean;
-  productName: string;
   currentStock: number;
   onClose: () => void;
   onSubmit?: (quantity: number) => void;
@@ -10,11 +9,11 @@ interface WriteDownsProps {
 
 export function WriteDowns({
   isOpen,
-  productName,
   currentStock,
   onClose,
   onSubmit,
 }: WriteDownsProps) {
+  const [productName, setProductName] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("1");
   const [error, setError] = useState<string>("");
 
@@ -51,10 +50,20 @@ export function WriteDowns({
             boxSizing: "border-box",
         }}
       >
-        <h3>Списание: {productName}</h3>
+        <h3>Списание:</h3>
+        <label>
+          Наименование товара:
+          <input
+            type="text"
+            value={productName}
+            onChange={(e) => {
+              setProductName(e.target.value);
+              if (error) setError("");
+            }}
+            placeholder="Введите имя товара"
+          />
         <p>Остаток: {currentStock}</p>
 
-        <label>
           Количество:
           <input
             type="number"
@@ -65,7 +74,6 @@ export function WriteDowns({
           />
         </label>
         {error && <span>{error}</span>}
-
         <div>
           <button type="submit">Расход</button>
           <button type="button" onClick={onClose}>

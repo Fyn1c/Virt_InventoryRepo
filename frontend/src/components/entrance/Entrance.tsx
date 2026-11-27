@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 
 interface EntranceProps {
   isOpen: boolean;
-  productName: string;
   onClose: () => void;
   onSubmit?: (quantity: number) => void;
 }
@@ -10,10 +9,10 @@ interface EntranceProps {
 
 export function Entrance({
   isOpen,
-  productName,
   onClose,
   onSubmit,
 }: EntranceProps) {
+  const [productName, setProductName] = useState<string>("");
   const [quantity, setQuantity] = useState<string>("1");
   const [error, setError] = useState<string>("");
 
@@ -51,8 +50,17 @@ export function Entrance({
         }}
       >
         <h3>Приход: {productName}</h3>
-
-         <label>
+        <label>
+          Наименование товара:
+          <input
+            type="text"
+            value={productName}
+            onChange={(e) => {
+              setProductName(e.target.value);
+              if (error) setError("");
+            }}
+            placeholder="Введите имя товара"
+          />
           Количество:
           <input
             type="number"
