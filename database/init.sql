@@ -1,14 +1,11 @@
-DROP TABLE IF EXISTS operations;
-DROP TABLE IF EXISTS products;
-
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     "id"            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "name"          varchar(200) NOT NULL CHECK (btrim(name) <> ''),
     "status"        TEXT NOT NULL,
     "created_at"    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE operations (
+CREATE TABLE IF NOT EXISTS operations (
     "id"            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "product_id"    INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     "type"          TEXT NOT NULL CHECK (type IN ('in', 'out', 'move')),
